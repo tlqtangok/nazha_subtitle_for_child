@@ -36,21 +36,35 @@ def strip_trailing_punctuation(text):
     return text.rstrip("。，！？；：、…—""''（）《》【】")
 
 
+def extract_clause(subtitle, char):
+    """Extract the smallest clause containing the target character.
+    
+    Splits the subtitle by Chinese punctuation and returns only the clause
+    that contains the target character, rather than the full subtitle.
+    """
+    clauses = re.split(r"[，。！？；]", subtitle)
+    for clause in clauses:
+        if char in clause:
+            return clause.strip()
+    return strip_trailing_punctuation(subtitle)
+
+
 def find_subtitle_for_char(char, subtitles, used_indices):
     """Find a subtitle line containing the given character.
     
     Tries to avoid reusing the same subtitle line by tracking used indices.
     Falls back to reusing if no unused match is found.
+    Returns only the clause containing the character, not the full subtitle.
     """
     # First pass: find an unused subtitle containing the character
     for i, subtitle in enumerate(subtitles):
         if char in subtitle and i not in used_indices:
             used_indices.add(i)
-            return strip_trailing_punctuation(subtitle)
+            return extract_clause(subtitle, char)
     # Second pass: allow reuse if no unused match found
     for i, subtitle in enumerate(subtitles):
         if char in subtitle:
-            return strip_trailing_punctuation(subtitle)
+            return extract_clause(subtitle, char)
     return None
 
 
