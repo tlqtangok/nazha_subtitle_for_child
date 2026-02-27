@@ -26,6 +26,11 @@ def load_subtitles(filepath):
     return [line.strip() for line in lines if line.strip()]
 
 
+def clean_line(text):
+    """Strip whitespace and zero-width spaces from a line."""
+    return text.strip().rstrip("\u200b")
+
+
 def strip_trailing_punctuation(text):
     """Strip trailing Chinese and common punctuation from text."""
     return text.rstrip("。，！？；：、…—""''（）《》【】")
@@ -50,17 +55,24 @@ def find_subtitle_for_char(char, subtitles, used_indices):
 
 
 def parse_template_line(line):
-    """Parse a template line and extract the character and the trailing format.
+    """Parse a template line and extract the character and any annotation suffix.
     
     Expected format: 一：我有一个气球的一字
-    Returns (char, suffix) e.g. ('一', '字') or None if line doesn't match.
+    Also handles: 说：我大胆说话的说话  (typo in template)
+                  季：四季都很美季字    (missing 的 in template)
+    Returns (char, annotation) where annotation is text after 字 like （补充场景）,
+    or None if line doesn't have a colon.
     """
-    line = line.strip().rstrip("\u200b")  # strip zero-width spaces
-    # Match: character + full/half-width colon + sentence + 的 + character + 字
-    match = re.match(r"^(.)[：:](.+)的\1(字.*)$", line)
-    if match:
-        return match.group(1), match.group(3)
-    return None
+    # Match: character + full/half-width colon + rest
+    match = re.match(r"^(.)[：:](.+)$", line)
+    if not match:
+        return None
+    char = match.group(1)
+    rest = match.group(2)
+    # Extract annotation suffix after 字 (e.g. （补充场景）)
+    ann_match = re.search(r"字(（.+）)$", rest)
+    annotation = ann_match.group(1) if ann_match else ""
+    return char, annotation
 
 
 def main():
@@ -71,21 +83,20 @@ def main():
     used_indices = set()
     output_lines = []
 
-    for line in template_lines:
-        line = line.strip().rstrip("\u200b")
+    for raw_line in template_lines:
+        line = clean_line(raw_line)
         if not line:
             continue
 
         parsed = parse_template_line(line)
         if parsed is None:
-            # Line doesn't match expected template format, keep as-is
             output_lines.append(line)
             continue
 
-        char, suffix = parsed
+        char, annotation = parsed
         subtitle = find_subtitle_for_char(char, subtitles, used_indices)
         if subtitle:
-            new_line = f"{char}:{subtitle}的{char}{suffix}"
+            new_line = f"{char}:{subtitle}的{char}字{annotation}"
         else:
             # No subtitle found containing this character, keep original
             new_line = line
