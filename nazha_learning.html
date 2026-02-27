@@ -450,14 +450,16 @@ function renderLevelSelect() {
   const grid = document.getElementById('level-grid');
   grid.innerHTML = '';
   let completedCount = Object.keys(completedLevels).length;
+  let foundFirstIncomplete = false;
 
   LEVELS.forEach((level, idx) => {
     const btn = document.createElement('button');
     btn.className = 'level-btn';
     if (completedLevels[idx]) {
       btn.classList.add('completed');
-    } else {
+    } else if (!foundFirstIncomplete) {
       btn.classList.add('current');
+      foundFirstIncomplete = true;
     }
     btn.innerHTML = '<span>' + level[0] + '</span><span class="level-num">' + (idx + 1) + '</span>';
     btn.onclick = () => startLevel(idx);
@@ -517,8 +519,13 @@ function readSentence(sentence, chars) {
 
   // 使用 Web Speech API
   if (!('speechSynthesis' in window)) {
-    // 无 TTS 支持，直接进入选择模式
-    highlightSequence(cards, () => enterSelectMode());
+    // 无 TTS 支持，逐字高亮后直接进入选择模式
+    let i = 0;
+    const interval = setInterval(() => {
+      cards.forEach(c => c.classList.remove('highlight'));
+      if (i < cards.length) { cards[i].classList.add('highlight'); i++; }
+      else { clearInterval(interval); cards.forEach(c => c.classList.remove('highlight')); enterSelectMode(); }
+    }, 400);
     return;
   }
 
@@ -535,11 +542,10 @@ function readSentence(sentence, chars) {
 
   let currentCharIdx = 0;
   const totalChars = chars.length;
-  const estimatedDuration = totalChars * 300; // ~300ms per char estimate
 
-  // 逐字高亮（基于时间估算）
+  // 逐字高亮（基于语速估算间隔）
   let highlightTimer = null;
-  const charInterval = 320; // ms per character
+  const charInterval = Math.round(320 / utterance.rate);
 
   function startHighlight() {
     currentCharIdx = 0;
@@ -697,12 +703,14 @@ function stopTimer() {
 }
 
 // ===== 语音引擎初始化 =====
+let voicesLoaded = false;
+function loadVoices() {
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) voicesLoaded = true;
+}
 if ('speechSynthesis' in window) {
-  // 某些浏览器需要先加载语音列表
-  window.speechSynthesis.getVoices();
-  window.speechSynthesis.onvoiceschanged = () => {
-    window.speechSynthesis.getVoices();
-  };
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
 }
 
 // ===== 初始化 =====
