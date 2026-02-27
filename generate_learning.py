@@ -109,18 +109,11 @@ def main():
 
         char, annotation = parsed
         subtitle = find_subtitle_for_char(char, subtitles, used_indices)
-        suffix = f"的{char}字"
         if subtitle:
-            new_line = f"{char}:{subtitle}{suffix}{suffix}{suffix}"
+            new_line = f"{char}:{subtitle}的{char}字"
         else:
-            # No subtitle found, use template sentence with triple suffix
-            base_line = line[:-len(annotation)] if annotation else line
-            # Strip existing single suffix (的X字 or X字) then re-add triple
-            if base_line.endswith(suffix):
-                base_line = base_line[:-len(suffix)]
-            elif base_line.endswith(f"{char}字"):
-                base_line = base_line[:-len(f"{char}字")]
-            new_line = f"{base_line}{suffix}{suffix}{suffix}"
+            # No subtitle found containing this character, keep original without annotation
+            new_line = line[:-len(annotation)] if annotation else line
         output_lines.append(new_line)
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:

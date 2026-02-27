@@ -22,13 +22,11 @@ draw subtitle from example
 
 运行 `python3 generate_learning.py` 可从 `nazha_subtitle.txt`（哪吒台词）和 `to_implement_template.txt`（汉字模板）自动生成 `gg_learning.txt`。
 
-每行格式为三次后缀，例如：
+每行格式示例：
 
 ```
-一:孕育了一颗混元珠的一字的一字的一字
+一:孕育了一颗混元珠的一字
 ```
-
-后缀 `的X字` 重复三次，朗读时帮助小朋友加深对目标汉字的印象。
 
 ### ✨ 功能特色
 
@@ -38,4 +36,3 @@ draw subtitle from example
 - 🎨 可爱的渐变色卡片 UI
 - ✨ 粒子庆祝动画效果
 - 📱 响应式设计，支持手机和平板
-- 🔁 三次后缀重复，强化汉字记忆
