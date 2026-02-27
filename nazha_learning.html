@@ -476,6 +476,27 @@ function showLevelSelect() {
   renderLevelSelect();
 }
 
+// ===== 后缀解析 =====
+function parseSentence(target, sentence) {
+  // 分离句子主体和后缀（如"的X字"），后缀仅朗读不生成卡片
+  // 如果去掉后缀后主体中不含目标字，则保留原句不拆分
+  const suffix3 = '的' + target + '字';
+  if (sentence.endsWith(suffix3)) {
+    const main = sentence.slice(0, -suffix3.length);
+    if (main.includes(target)) {
+      return { mainPart: main, fullSentence: sentence };
+    }
+  }
+  const suffix2 = target + '字';
+  if (sentence.endsWith(suffix2)) {
+    const main = sentence.slice(0, -suffix2.length);
+    if (main.includes(target)) {
+      return { mainPart: main, fullSentence: sentence };
+    }
+  }
+  return { mainPart: sentence, fullSentence: sentence };
+}
+
 // ===== 游戏逻辑 =====
 function startLevel(idx) {
   currentLevel = idx;
@@ -493,9 +514,9 @@ function startLevel(idx) {
   document.getElementById('instruction').textContent = '认真听哦～';
   document.getElementById('timer').textContent = '⏱ 0s';
 
-  // 生成卡片 - 使用句子中的字符（去掉最后的"的X字"部分）
-  const displaySentence = sentence;
-  const chars = [...displaySentence];
+  // 分离主体和后缀：后缀（如"的X字"）仅朗读，不生成卡片
+  const { mainPart, fullSentence } = parseSentence(target, sentence);
+  const chars = [...mainPart];
   const container = document.getElementById('cards-container');
   container.innerHTML = '';
 
@@ -508,8 +529,8 @@ function startLevel(idx) {
     container.appendChild(card);
   });
 
-  // 开始朗读
-  setTimeout(() => readSentence(displaySentence, chars), 500);
+  // 开始朗读（朗读完整句子，包括后缀的读音）
+  setTimeout(() => readSentence(fullSentence, chars), 500);
 }
 
 function readSentence(sentence, chars) {
@@ -674,9 +695,10 @@ function replayReading() {
 
   stopTimer();
 
-  const [, sentence] = LEVELS[currentLevel];
-  const chars = [...sentence];
-  readSentence(sentence, chars);
+  const [target, sentence] = LEVELS[currentLevel];
+  const { mainPart, fullSentence } = parseSentence(target, sentence);
+  const chars = [...mainPart];
+  readSentence(fullSentence, chars);
 }
 
 // ===== 计时器 =====
