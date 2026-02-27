@@ -110,10 +110,10 @@ def main():
         char, annotation = parsed
         subtitle = find_subtitle_for_char(char, subtitles, used_indices)
         if subtitle:
-            new_line = f"{char}:{subtitle}的{char}字{annotation}"
+            new_line = f"{char}:{subtitle}的{char}字"
         else:
-            # No subtitle found containing this character, keep original
-            new_line = line
+            # No subtitle found containing this character, keep original without annotation
+            new_line = line[:-len(annotation)] if annotation else line
         output_lines.append(new_line)
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
