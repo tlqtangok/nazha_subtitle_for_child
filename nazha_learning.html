@@ -99,6 +99,9 @@ body {
   max-width: 800px;
   margin: 0 auto;
   padding: 15px;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
 }
 .game-header {
   display: flex;
@@ -136,8 +139,12 @@ body {
 
 .game-prompt {
   text-align: center;
-  padding: 15px;
-  margin-bottom: 15px;
+  padding: 10px;
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
 }
 .game-prompt .instruction {
   color: #fff;
@@ -157,7 +164,12 @@ body {
   justify-content: center;
   gap: 12px;
   padding: 20px 10px;
-  min-height: 200px;
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 760px;
 }
 .char-card {
   width: 72px;
@@ -220,8 +232,12 @@ body {
 .result-panel {
   display: none;
   text-align: center;
-  padding: 30px;
-  margin-top: 20px;
+  padding: 20px;
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
 }
 .result-panel .result-icon { font-size: 4em; }
 .result-panel .result-text {
@@ -250,7 +266,6 @@ body {
 /* 重读按钮 */
 .replay-btn {
   display: none;
-  margin: 10px auto;
   padding: 10px 24px;
   font-size: 1.1em;
   background: rgba(255,255,255,0.2);
@@ -259,6 +274,10 @@ body {
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.2s;
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
 }
 .replay-btn:hover {
   background: rgba(255,255,255,0.35);
@@ -320,8 +339,24 @@ body {
   .title-banner h1 { font-size: 1.6em; }
   .level-grid { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; }
   .level-btn { font-size: 1.2em; }
-  .char-card { width: 58px; height: 72px; font-size: 1.8em; }
-  .cards-container { gap: 8px; }
+  .char-card { width: 52px; height: 64px; font-size: 1.6em; }
+  .cards-container { gap: 8px; padding: 10px 5px; }
+  .game-prompt { top: 10%; padding: 5px; }
+  .game-prompt .instruction { font-size: 1.1em; }
+  .game-prompt .status-icon { font-size: 2.2em; margin-bottom: 5px; }
+  .replay-btn { bottom: 8%; font-size: 1em; padding: 8px 18px; }
+  .result-panel { bottom: 5%; padding: 15px; }
+  .result-panel .result-icon { font-size: 3em; }
+  .result-panel .result-text { font-size: 1.2em; margin: 8px 0; }
+  .result-panel .next-btn { padding: 10px 30px; font-size: 1.1em; }
+  .game-header { padding: 8px 10px; margin-bottom: 0; }
+}
+@media (max-height: 700px) {
+  .game-prompt { top: 8%; }
+  .game-prompt .status-icon { font-size: 2em; margin-bottom: 3px; }
+  .game-prompt .instruction { font-size: 1em; }
+  .char-card { width: 50px; height: 62px; font-size: 1.5em; }
+  .cards-container { gap: 6px; }
 }
 </style>
 </head>
@@ -645,23 +680,18 @@ function onCardClick(card) {
     completedLevels[currentLevel] = true;
     localStorage.setItem('nazha_completed', JSON.stringify(completedLevels));
 
-    // 显示结果
+    // 庆祝后读三遍目标字并高亮，然后自动下一关
     setTimeout(() => {
       celebrate();
       document.getElementById('replay-btn').style.display = 'none';
-      const panel = document.getElementById('result-panel');
-      panel.style.display = 'block';
-      document.getElementById('result-icon').textContent = wrongCount === 0 ? '🌟' : '👍';
-      document.getElementById('result-text').textContent = wrongCount === 0 ? '太棒了！一次就对啦！' : '答对了！继续加油哦～';
-      document.getElementById('result-time').textContent = '用时 ' + timerSeconds + ' 秒' + (wrongCount > 0 ? ' · 错了 ' + wrongCount + ' 次' : '');
+      document.getElementById('status-icon').textContent = '🎉';
+      document.getElementById('instruction').textContent = wrongCount === 0 ? '太棒了！一次就对啦！' : '答对了！继续加油哦～';
 
-      if (currentLevel >= LEVELS.length - 1) {
-        document.getElementById('next-btn').textContent = '🏠 返回关卡';
-        document.getElementById('next-btn').onclick = showLevelSelect;
-      } else {
-        document.getElementById('next-btn').textContent = '下一关 ▶';
-        document.getElementById('next-btn').onclick = nextLevel;
-      }
+      // 读三遍当前关卡的字，边读边高亮
+      readTargetCharTimes(target, card, 3, () => {
+        // 读完三遍后自动跳到下一关
+        setTimeout(() => nextLevel(), 800);
+      });
     }, 600);
   } else {
     // 错误
@@ -670,6 +700,50 @@ function onCardClick(card) {
     playSound('wrong');
     setTimeout(() => card.classList.remove('wrong'), 500);
   }
+}
+
+// ===== 读目标字N遍并高亮 =====
+function readTargetCharTimes(target, card, times, callback) {
+  let count = 0;
+  function readOnce() {
+    if (count >= times) {
+      card.classList.remove('highlight');
+      if (callback) callback();
+      return;
+    }
+    count++;
+    document.getElementById('instruction').textContent = '跟着读："' + target + '"（第' + count + '/' + times + '遍）';
+    // 高亮卡片
+    card.classList.add('highlight');
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(target);
+      utt.lang = 'zh-CN';
+      utt.rate = 0.6;
+      utt.pitch = 1.1;
+      let voices = window.speechSynthesis.getVoices();
+      const zhVoice = voices.find(v => v.lang.startsWith('zh'));
+      if (zhVoice) utt.voice = zhVoice;
+
+      utt.onend = () => {
+        card.classList.remove('highlight');
+        setTimeout(readOnce, 400);
+      };
+      utt.onerror = () => {
+        card.classList.remove('highlight');
+        setTimeout(readOnce, 400);
+      };
+      setTimeout(() => window.speechSynthesis.speak(utt), 200);
+    } else {
+      // 无TTS，简单延时模拟
+      setTimeout(() => {
+        card.classList.remove('highlight');
+        setTimeout(readOnce, 400);
+      }, 800);
+    }
+  }
+  readOnce();
 }
 
 function nextLevel() {
