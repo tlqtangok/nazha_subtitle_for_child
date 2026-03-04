@@ -84,7 +84,24 @@ body {
   background: linear-gradient(135deg, #e0e0e0, #bdbdbd);
   color: #9e9e9e;
 }
-.level-btn:not(.locked):hover {
+.level-btn.needs-review {
+  background: linear-gradient(135deg, #42a5f5, #1565c0);
+  color: #fff;
+}
+.level-btn.needs-review::after {
+  content: "↩";
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.5em;
+}
+.level-btn.excluded {
+  background: linear-gradient(135deg, #e0e0e0, #bdbdbd);
+  color: #9e9e9e;
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.level-btn:not(.locked):not(.excluded):hover {
   transform: scale(1.1);
   box-shadow: 0 6px 20px rgba(0,0,0,0.25);
 }
@@ -92,6 +109,52 @@ body {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255,167,38,0.6); }
   50% { box-shadow: 0 0 0 10px rgba(255,167,38,0); }
 }
+
+/* ===== 配置面板 ===== */
+.config-panel {
+  background: rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 0 15px;
+  margin: 8px 0 15px;
+}
+.config-panel summary {
+  color: #fff;
+  font-size: 1.05em;
+  cursor: pointer;
+  user-select: none;
+  padding: 12px 0;
+  list-style: none;
+}
+.config-panel summary::-webkit-details-marker { display: none; }
+.config-panel[open] summary { border-bottom: 1px solid rgba(255,255,255,0.15); margin-bottom: 8px; }
+.config-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  color: #ffe0b2;
+  font-size: 0.95em;
+  flex-wrap: wrap;
+}
+.config-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+.config-item input[type="text"] {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.95em;
+  width: 180px;
+}
+.config-save-btn {
+  padding: 5px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #ffa726;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: background 0.2s;
+}
+.config-save-btn:hover { background: #fb8c00; }
 
 /* ===== 游戏页 ===== */
 #game-screen {
@@ -373,7 +436,19 @@ body {
   <div class="progress-bar">
     <div class="fill" id="progress-fill" style="width: 0%"></div>
   </div>
-  <p style="text-align:center;color:#ffe0b2;margin-bottom:15px;" id="progress-text">已完成 0/300 关</p>
+  <p style="text-align:center;color:#ffe0b2;margin-bottom:10px;" id="progress-text">加载关卡中...</p>
+  <details class="config-panel" id="config-panel">
+    <summary>⚙️ 游戏设置</summary>
+    <div class="config-item">
+      <input type="checkbox" id="cfg-read3" checked>
+      <label for="cfg-read3">答对后朗读目标字 3 遍</label>
+    </div>
+    <div class="config-item">
+      <label for="cfg-exclude">排除关卡（填关卡序号，逗号分隔）：</label>
+      <input type="text" id="cfg-exclude" placeholder="例：5,10,15">
+      <button class="config-save-btn" onclick="saveConfig()">保存</button>
+    </div>
+  </details>
   <div class="level-grid" id="level-grid"></div>
 </div>
 
@@ -399,8 +474,29 @@ body {
 </div>
 
 <script>
-// ===== 关卡数据 =====
-const LEVELS = [["一", "孕育了一颗混元珠的一字"], ["二", "我要证明我才是十二金仙的最佳人选的二字"], ["三", "就算留他一命他也活不过三年的三字"], ["四", "阐教名扬四海的四字"], ["五", "我们七山五岭可就出了的五字"], ["六", "六星连珠的六字"], ["七", "一口七八个的七字"], ["八", "正儿八经的高难度的八字"], ["九", "共有九千枚的九字"], ["十", "都几十年没跟人聊过天了的十字"], ["百", "来来回回千百遍的百字"], ["千", "千灵重元的千字"], ["万", "万人敬仰的太乙真人的万字"], ["上", "天上一天地上一年的上字"], ["下", "李某人实难就此痛下杀手的下字"], ["大", "必会大开杀戒的大字"], ["小", "我们都叫它小云云的小字"], ["多", "多谢师尊栽培的多字"], ["少", "却少了时间陪伴的少字"], ["高", "那都是高阶的变身术的高字"], ["矮", "虽然你个头矮小的矮字"], ["长", "力量不断增长的长字"], ["短", "三年短是短了点的短字"], ["胖", "死胖子的胖字"], ["瘦", "小猴长得瘦瘦的瘦字"], ["好", "好个太乙的好字"], ["坏", "但心地不坏的坏字"], ["对", "其实你心里是想被人们接受的对不对的对字"], ["错", "没错啊的错字"], ["正", "成为一个斩妖除魔的正义之士的正字"], ["反", "我们要反击的反字"], ["前", "在他学会控制情绪前的前字"], ["后", "等真人回来后我定要告诉你渎职加诬陷的后字"], ["左", "穿过回廊右转再左转的左字"], ["右", "我想往右躲呀的右字"], ["里", "离开这里的里字"], ["外", "在外遇事要冷静的外字"], ["内", "太乙仙长也在城内的内字"], ["外", "这人是从城外来的的外字"], ["东", "以防申公豹和东海龙族来犯的东字"], ["西", "打个大西瓜 你们两个的西字"], ["南", "众师弟天南地北的南字"], ["北", "北海龙王的北字"], ["天", "跻身天界的天字"], ["地", "让我一个人安静地死去的地字"], ["日", "今日之恩他日定全力以报的日字"], ["月", "日月同生的月字"], ["星", "你瞧今晚是何星象的星字"], ["云", "高手如云的云字"], ["风", "除了看风景我还能干啥的风字"], ["雨", "降雨行风的雨字"], ["雪", "我们报仇雪恨的千载良机到了的雪字"], ["雷", "天雷来了他都是个死的雷字"], ["电", "而是身体能化作电流的电字"], ["山", "人心中的成见是一座大山的山字"], ["水", "让肌肤光滑水嫩有弹性的水字"], ["火", "在你那儿它就变风火轮了的火字"], ["石", "石矶的石字"], ["田", "田七粉的田字"], ["土", "敢到土肥坡来撒野啊的土字"], ["河", "快封冻河水的河字"], ["海", "方圆一里的海面已被我冻结的海字"], ["江", "江上有轮船的江字"], ["湖", "五湖四海的湖字"], ["草", "茜草的草字"], ["花", "臭讲究 你花样儿多哟的花字"], ["树", "山啊树啊花啊草啊的树字"], ["叶", "树叶绿绿的叶字"], ["木", "金吒木吒的弟弟的木字"], ["林", "树林里有小鸟的林字"], ["森", "森林里有很多树的森字"], ["人", "人逢喜事精神爽的人字"], ["口", "不留活口的口字"], ["手", "并与敖丙携手的手字"], ["足", "不足的火候的足字"], ["目", "体验一下我精心设计的保留项目的目字"], ["耳", "我用耳朵听音乐的耳字"], ["头", "下次你点个头就行啦的头字"], ["面", "在我面前就没人帅得起来的面字"], ["牙", "少爷饭后可得记得刷牙呀的牙字"], ["舌", "我用舌头尝味道的舌字"], ["心", "你们看哪吒玩的多开心啊的心字"], ["肚", "肚子要撑破的肚字"], ["腿", "用腿啊的腿字"], ["脚", "修炼了出去捧那些白痴的臭脚的脚字"], ["身", "脚在我身上谁拦得住的身字"], ["体", "成何体统啊的体字"], ["爸", "我的爸爸很勇敢的爸字"], ["妈", "妈呀的妈字"], ["爷", "大伙儿来给三少爷送行的爷字"], ["奶", "我的奶奶会织毛衣的奶字"], ["哥", "看来大哥是的哥字"], ["姐", "喂 师姐等等我的姐字"], ["弟", "师弟你莫吓到它了哦的弟字"], ["妹", "小妹原想献计的妹字"], ["儿", "哪儿来的小屁孩儿的儿字"], ["子", "别伤害我的孩子的子字"], ["夫", "一露功夫身份就暴露了的夫字"], ["妻", "妈妈是爸爸的妻子的妻字"], ["父", "魔丸哪吒受父母感化的父字"], ["母", "哪个父母不想儿子变得更优秀呢的母字"], ["男", "男子汉就得阳刚硬朗的男字"], ["女", "谁是方圆十里最美的女人的女字"], ["老", "痛死老娘了的老字"], ["少", "你误伤了多少无辜百姓的少字"], ["幼", "幼儿园里有很多小朋友的幼字"], ["儿", "儿啊的儿字"], ["童", "鹤童的童字"], ["学", "障眼法都学不会其它的你就不要学了的学字"], ["校", "我的学校很漂亮的校字"], ["园", "幼儿园里有滑梯的园字"], ["班", "我在大班的班字"], ["级", "三只地仙级别的妖王的级字"], ["师", "拜师的师字"], ["生", "造福苍生的生字"], ["书", "我有很多图画书的书字"], ["本", "偏要让你瞧瞧我的本事的本字"], ["笔", "我用彩笔涂色的笔字"], ["纸", "想起忘带纸的纸字"], ["尺", "我用尺子画直线的尺字"], ["刀", "人刀合一的刀字"], ["画", "画风不对啊的画字"], ["写", "我练习写汉字的写字"], ["读", "我读小故事书的读字"], ["听", "我脑袋里能听到你的声音诶的听字"], ["说", "说亲的的说字"], ["唱", "我大声唱歌的唱字"], ["跳", "我开心跳舞的跳字"], ["跑", "夜叉是它放跑的的跑字"], ["走", "暴走了的走字"], ["坐", "那你咋坐上去了的坐字"], ["立", "我们成立伏魔帮的立字"], ["睡", "吃了这个立马睡着的睡字"], ["醒", "你怎么又醒了的醒字"], ["哭", "你哭了的哭字"], ["笑", "他在跟妖怪开玩笑的笑字"], ["吃", "晚上回来娘给你做好吃的的吃字"], ["喝", "最近水喝少了的喝字"], ["玩", "下次一定陪你玩到尽兴的玩字"], ["乐", "还轮不到你们在这儿幸灾乐祸的乐字"], ["喜", "皆......皆大欢喜的喜字"], ["爱", "还得可爱乖巧的爱字"], ["想", "我想起来了的想字"], ["要", "休要猖狂的要字"], ["有", "有你们陪的有字"], ["没", "没法了的没字"], ["来", "把你关起来 不准你再出来作恶的来字"], ["去", "出去跟爹娘一起斩妖除魔的去字"], ["进", "也关……关进城去的进字"], ["出", "多谢你们给我时间发挥出真正实力的出字"], ["开", "再让你娃开开眼的开字"], ["关", "说是闭关编撰封神榜什么的的关字"], ["合", "机缘巧合下的合字"], ["分", "元始天尊将其一分为二的分字"], ["放", "放屁 别人的看法都是狗屁的放字"], ["拿", "你……你拿回去的拿字"], ["给", "先给你定型吧的给字"], ["要", "我都要无聊死了的要字"], ["会", "他们又岂会把你当妖怪的会字"], ["能", "看能不能再为孩子做点什么吧的能字"], ["可", "魔丸元神坚不可摧的可字"], ["以", "可以再美化些吗的以字"], ["好", "好美的好字"], ["行", "今后要担负起替天行道的重任的行字"], ["不", "我定惩不饶的不字"], ["没", "我也没意见了的没字"], ["别", "有我在你就别想捣乱的别字"], ["再", "我们不能一错再错的再字"], ["又", "七天后又当如何的又字"], ["也", "我也不知道的也字"], ["还", "莫乱动身体还没有定型的还字"], ["就", "你生来就是魔丸的就字"], ["才", "那帮白痴才反应过来啊的才字"], ["刚", "你刚才是不是用的刚字"], ["正", "太乙仙长正为敖丙重塑肉身的正字"], ["在", "在元始天尊的弟子中的在字"], ["着", "娘真想看着你长大的着字"], ["了", "我早习惯了的了字"], ["过", "我说过的过字"], ["去", "褪去魔性的去字"], ["来", "看来我的时间到了的来字"], ["到", "到底怎么改你们统一下噻的到字"], ["达", "无法表达的的达字"], ["及", "七色宝莲主守护及孕育的及字"], ["时", "但是细节打磨还需要很长时间的时字"], ["间", "还需一炷香的时间的间字"], ["日", "度日如年的日字"], ["月", "它贪婪地吸食日月精华的月字"], ["年", "三年后引天雷摧毁魔丸的年字"], ["岁", "少爷都三岁了的岁字"], ["天", "天地灵气的天字"], ["今", "今天就要踢尽兴的今字"], ["明", "明明是你粗心大意的明字"], ["后", "后因申公豹从中作梗的后字"], ["前", "我等前去御敌的前字"], ["昨", "昨日一战的昨字"], ["晨", "早晨空气好的晨字"], ["午", "中午要吃午饭的午字"], ["晚", "早晚的事的晚字"], ["夜", "就说是夜叉干的的夜字"], ["春", "春天花开了的春字"], ["夏", "夏天可以游泳的夏字"], ["秋", "盼天尊明察秋毫的秋字"], ["冬", "冬天下雪了的冬字"], ["季", "四季都很美季字"], ["节", "知不知道什么叫细节决定成败的节字"], ["衣", "带小师侄去更衣的衣字"], ["帽", "我戴帽子保暖的帽字"], ["鞋", "我穿新鞋子的鞋字"], ["袜", "我穿袜子的袜字"], ["裤", "我穿裤子的裤字"], ["裙", "我要换裙子的裙字"], ["衫", "我穿小衬衫的衫字"], ["袄", "冬天穿棉袄的袄字"], ["饭", "愁得都吃不下饭了的饭字"], ["菜", "你咋这菜的菜字"], ["米", "米饭用大米做的米字"], ["面", "海面出现敌情的面字"], ["包", "包罗天地的包字"], ["汤", "药都化汤里了的汤字"], ["蛋", "我吃鸡蛋的蛋字"], ["奶", "我喝牛奶的奶字"], ["肉", "但你们的肉身被毁的肉字"], ["鱼", "另外还多了一百筐鱼虾水产的鱼字"], ["果", "哪吒果然是不认命的果字"], ["苹", "我吃苹果的苹字"], ["果", "难道同归于尽就是你们想要的结果的果字"], ["香", "我们一炷香还是撑得了的的香字"], ["甜", "糖果甜甜的甜字"], ["酸", "柠檬酸酸的酸字"], ["苦", "缓减灼烧之苦的苦字"], ["辣", "辣椒辣辣的辣字"], ["杯", "多喝几杯再走嘛的杯字"], ["碗", "我用碗吃饭的碗字"], ["筷", "我用筷子夹菜的筷字"], ["勺", "我用勺子喝汤的勺字"], ["盘", "你送我的罗盘的盘字"], ["盆", "原本半年才集得了一盆的盆字"], ["桌", "我在桌子上写字的桌字"], ["椅", "我坐在椅子上的椅字"], ["床", "不如瘫在床上睡的床字"], ["柜", "衣服放在柜子里的柜字"], ["门", "玉虚名门济天下的门字"], ["窗", "我打开窗户的窗字"], ["灯", "自诩照世明灯的灯字"], ["扇", "夏天用扇子的扇字"], ["钟", "时钟会滴答响的钟字"], ["表", "无法表达的的表字"], ["车", "我坐汽车的车字"], ["马", "你单枪匹马怕是难有什么作为的马字"], ["牛", "老牛在吃草的牛字"], ["羊", "小羊咩咩叫的羊字"], ["狗", "放开那条狗的狗字"], ["猫", "活该你当一辈子熊猫眼的猫字"], ["鸡", "鸡犬不留的鸡字"], ["鸭", "小鸭子游水的鸭字"], ["鹅", "大白鹅唱歌的鹅字"], ["鸟", "去你个鸟仙的鸟字"], ["虫", "小虫子爬的虫字"], ["鱼", "等我的鱼翅烤熟了你也尝尝的鱼字"], ["虾", "另外还多了一百筐鱼虾水产的虾字"], ["蟹", "蟹钳也好了的蟹字"], ["兔", "小兔子爱吃萝卜的兔字"], ["猪", "飞天猪的记忆力无人能及的猪字"], ["虎", "你们这帮为虎作伥的小辈的虎字"], ["狮", "狮子是百兽之王的狮字"], ["熊", "谁吃了熊心豹子胆啦的熊字"], ["猴", "小猴子爱爬树的猴字"], ["鼠", "小老鼠偷粮食的鼠字"], ["蛇", "它们的归降只是虚与委蛇的蛇字"], ["蛙", "小青蛙叫的蛙字"], ["龟", "小乌龟爬得慢的龟字"], ["蚁", "小蚂蚁搬东西的蚁字"], ["蜂", "小蜜蜂采蜜的蜂字"], ["蝶", "蝴蝶飞的蝶字"], ["蜻", "蜻蜓飞的蜻字"], ["蜓", "蜻蜓点水的蜓字"], ["蚯", "蚯蚓松土的蚯字"], ["蚓", "蚯蚓在土里的蚓字"], ["蚂", "蚂蚁的蚂字"], ["蚱", "蚱蜢跳的蚱字"], ["蜢", "蚱蜢的蜢字"], ["蜻", "蜻蜒的蜻字"], ["蜓", "蜻蜒的蜓字"], ["花", "红花的花字"], ["草", "城里正好缺粮草啊的草字"], ["树", "山啊树啊花啊草啊的树字"], ["叶", "枫叶红红的叶字"], ["果", "老夫果然没有看错的果字"], ["种", "玉虚宫的宝库里有种法宝的种字"], ["长", "仙长的长字"], ["开", "开工的开字"], ["结", "二人居然结为挚友的结字"], ["收", "收你们来了的收字"], ["藏", "这玉虚宝库中珍藏的的藏字"], ["找", "就说刚才怎么找不见了的找字"], ["见", "又不是见不到了的见字"], ["看", "看嘛的看字"], ["听", "我就经常摆两个哥的故事给他听的听字"], ["说", "都说名师出高徒的说字"]];
+// ===== 关卡数据（从 gg_learning.txt 动态加载）=====
+let LEVELS = [];
+
+// 每次答错后，几关后安排复习
+const REVIEW_INTERVAL = 5;
+
+async function loadLevels() {
+  try {
+    const resp = await fetch('gg_learning.txt');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const text = await resp.text();
+    const lines = text.split('\n').filter(l => l.trim());
+    const parsed = [];
+    for (const line of lines) {
+      const match = line.match(/^([^:：]+)[：:](.*)/);
+      if (match) parsed.push([match[1].trim(), match[2].trim()]);
+    }
+    if (parsed.length > 0) LEVELS = parsed;
+  } catch(e) {
+    console.warn('无法加载 gg_learning.txt，请通过 Web 服务器打开本页面。', e);
+    document.getElementById('progress-text').textContent = '⚠️ 无法加载关卡数据，请用 Web 服务器打开本页面';
+  }
+}
 
 // ===== 状态 =====
 let currentLevel = 0;
@@ -409,6 +505,12 @@ let timerSeconds = 0;
 let gamePhase = 'idle'; // idle, reading, selecting, done
 let completedLevels = JSON.parse(localStorage.getItem('nazha_completed') || '{}');
 let wrongCount = 0;
+let firstClickWrong = false;
+let pendingReviews = JSON.parse(localStorage.getItem('nazha_reviews') || '[]');
+let normalLevelsCompleted = parseInt(localStorage.getItem('nazha_normal_count') || '0');
+let isReviewMode = false;
+let reviewReturnLevel = -1;
+let config = JSON.parse(localStorage.getItem('nazha_config') || '{"readAfterCorrect":true,"excludedLevels":[]}');
 
 // ===== 音效 (Web Audio API) =====
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -484,23 +586,43 @@ function celebrate() {
 function renderLevelSelect() {
   const grid = document.getElementById('level-grid');
   grid.innerHTML = '';
-  let completedCount = Object.keys(completedLevels).length;
+  let completedCount = Object.values(completedLevels).filter(v => v === 'green' || v === true).length;
+  // v === true: backward compatibility with old localStorage format that stored boolean true
+  const excludedSet = new Set(config.excludedLevels || []);
 
   LEVELS.forEach((level, idx) => {
+    const levelNum = idx + 1;
     const btn = document.createElement('button');
-    btn.className = 'level-btn';
-    if (completedLevels[idx]) {
-      btn.classList.add('completed');
+    btn.innerHTML = '<span>' + level[0] + '</span><span class="level-num">' + levelNum + '</span>';
+
+    if (excludedSet.has(levelNum)) {
+      btn.className = 'level-btn excluded';
+      btn.title = '已排除（点击可取消排除）';
+      btn.onclick = () => {
+        config.excludedLevels = config.excludedLevels.filter(n => n !== levelNum);
+        localStorage.setItem('nazha_config', JSON.stringify(config));
+        document.getElementById('cfg-exclude').value = config.excludedLevels.join(', ');
+        renderLevelSelect();
+      };
     } else {
-      btn.classList.add('current');
+      btn.className = 'level-btn';
+      const status = completedLevels[idx];
+      // status === true: backward compatibility with old localStorage format
+      if (status === 'green' || status === true) {
+        btn.classList.add('completed');
+      } else if (status === 'blue') {
+        btn.classList.add('needs-review');
+      } else {
+        btn.classList.add('current');
+      }
+      btn.onclick = () => startLevel(idx);
     }
-    btn.innerHTML = '<span>' + level[0] + '</span><span class="level-num">' + (idx + 1) + '</span>';
-    btn.onclick = () => startLevel(idx);
     grid.appendChild(btn);
   });
 
-  document.getElementById('progress-fill').style.width = (completedCount / LEVELS.length * 100) + '%';
-  document.getElementById('progress-text').textContent = '已完成 ' + completedCount + '/' + LEVELS.length + ' 关';
+  const total = LEVELS.length;
+  document.getElementById('progress-fill').style.width = total ? (completedCount / total * 100) + '%' : '0%';
+  document.getElementById('progress-text').textContent = '已完成 ' + completedCount + '/' + total + ' 关';
 }
 
 function showLevelSelect() {
@@ -509,6 +631,30 @@ function showLevelSelect() {
   document.getElementById('level-select').style.display = 'block';
   document.getElementById('game-screen').style.display = 'none';
   renderLevelSelect();
+}
+
+// ===== 配置 =====
+function saveConfig() {
+  config.readAfterCorrect = document.getElementById('cfg-read3').checked;
+  const raw = document.getElementById('cfg-exclude').value;
+  config.excludedLevels = raw.split(',')
+    .map(s => parseInt(s.trim()))
+    .filter(n => !isNaN(n) && n > 0 && n <= LEVELS.length);
+  localStorage.setItem('nazha_config', JSON.stringify(config));
+  renderLevelSelect();
+}
+
+function loadConfigUI() {
+  document.getElementById('cfg-read3').checked = config.readAfterCorrect !== false;
+  document.getElementById('cfg-exclude').value = (config.excludedLevels || []).join(', ');
+}
+
+// ===== 下一关辅助 =====
+function findNextLevel(fromIdx) {
+  const excludedSet = new Set(config.excludedLevels || []);
+  let next = fromIdx + 1;
+  while (next < LEVELS.length && excludedSet.has(next + 1)) next++;
+  return next < LEVELS.length ? next : -1;
 }
 
 // ===== 后缀解析 =====
@@ -536,6 +682,7 @@ function parseSentence(target, sentence) {
 function startLevel(idx) {
   currentLevel = idx;
   wrongCount = 0;
+  firstClickWrong = false;
   gamePhase = 'reading';
 
   document.getElementById('level-select').style.display = 'none';
@@ -544,7 +691,8 @@ function startLevel(idx) {
   document.getElementById('replay-btn').style.display = 'none';
 
   const [target, sentence] = LEVELS[idx];
-  document.getElementById('level-info').textContent = '第 ' + (idx + 1) + ' 关';
+  const labelPrefix = isReviewMode ? '🔁 复习第 ' : '第 ';
+  document.getElementById('level-info').textContent = labelPrefix + (idx + 1) + ' 关';
   document.getElementById('status-icon').textContent = '🎧';
   document.getElementById('instruction').textContent = '认真听哦～';
   document.getElementById('timer').textContent = '⏱ 0s';
@@ -676,25 +824,50 @@ function onCardClick(card) {
       c.onclick = null;
     });
 
-    // 标记完成
-    completedLevels[currentLevel] = true;
+    // 根据首次点选结果更新状态
+    if (isReviewMode) {
+      if (firstClickWrong) {
+        // 复习仍然第一次点错，继续蓝色，5关后再复习
+        completedLevels[currentLevel] = 'blue';
+        pendingReviews.push({levelIdx: currentLevel, afterCount: normalLevelsCompleted + REVIEW_INTERVAL});
+        localStorage.setItem('nazha_reviews', JSON.stringify(pendingReviews));
+      } else {
+        // 复习一次正确，升绿
+        completedLevels[currentLevel] = 'green';
+      }
+      // 复习关卡不计入 normalLevelsCompleted
+    } else {
+      if (firstClickWrong) {
+        // 首次点错，标蓝，5关后安排复习
+        completedLevels[currentLevel] = 'blue';
+        pendingReviews.push({levelIdx: currentLevel, afterCount: normalLevelsCompleted + REVIEW_INTERVAL});
+        localStorage.setItem('nazha_reviews', JSON.stringify(pendingReviews));
+      } else {
+        completedLevels[currentLevel] = 'green';
+      }
+      normalLevelsCompleted++;
+      localStorage.setItem('nazha_normal_count', normalLevelsCompleted);
+    }
     localStorage.setItem('nazha_completed', JSON.stringify(completedLevels));
 
-    // 庆祝后读三遍目标字并高亮，然后自动下一关
+    // 庆祝后读目标字（依配置决定是否读3遍），然后自动下一关
     setTimeout(() => {
       celebrate();
       document.getElementById('replay-btn').style.display = 'none';
       document.getElementById('status-icon').textContent = '🎉';
       document.getElementById('instruction').textContent = wrongCount === 0 ? '太棒了！一次就对啦！' : '答对了！继续加油哦～';
 
-      // 读三遍当前关卡的字，边读边高亮
-      readTargetCharTimes(target, card, 3, () => {
-        // 读完三遍后自动跳到下一关
-        setTimeout(() => nextLevel(), 800);
-      });
+      if (config.readAfterCorrect !== false) {
+        readTargetCharTimes(target, card, 3, () => {
+          setTimeout(() => nextLevel(), 800);
+        });
+      } else {
+        setTimeout(() => nextLevel(), 1200);
+      }
     }, 600);
   } else {
     // 错误
+    if (!firstClickWrong) firstClickWrong = true;
     wrongCount++;
     card.classList.add('wrong');
     playSound('wrong');
@@ -747,8 +920,29 @@ function readTargetCharTimes(target, card, times, callback) {
 }
 
 function nextLevel() {
-  if (currentLevel < LEVELS.length - 1) {
-    startLevel(currentLevel + 1);
+  // 先检查是否有到期的待复习关卡
+  const dueIdx = pendingReviews.findIndex(r => r.afterCount <= normalLevelsCompleted);
+  if (dueIdx !== -1) {
+    const due = pendingReviews.splice(dueIdx, 1)[0];
+    localStorage.setItem('nazha_reviews', JSON.stringify(pendingReviews));
+    // 记录复习完后该回到哪一关
+    reviewReturnLevel = isReviewMode ? reviewReturnLevel : findNextLevel(currentLevel);
+    isReviewMode = true;
+    startLevel(due.levelIdx);
+    return;
+  }
+
+  // 无复习，正常推进
+  let nextIdx;
+  if (isReviewMode) {
+    nextIdx = reviewReturnLevel;
+    isReviewMode = false;
+  } else {
+    nextIdx = findNextLevel(currentLevel);
+  }
+
+  if (nextIdx !== -1 && nextIdx < LEVELS.length) {
+    startLevel(nextIdx);
   } else {
     showLevelSelect();
   }
@@ -803,7 +997,10 @@ if ('speechSynthesis' in window) {
 
 // ===== 初始化 =====
 createStars();
-renderLevelSelect();
+loadLevels().then(() => {
+  loadConfigUI();
+  renderLevelSelect();
+});
 </script>
 </body>
 </html>
