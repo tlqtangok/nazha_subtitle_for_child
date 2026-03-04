@@ -45,15 +45,22 @@ draw subtitle from example
 
 也可直接双击在浏览器打开，部分浏览器（如 Firefox）支持本地文件访问。
 
-### 📝 数据生成
+### 📝 关卡数据
 
-运行 `python3 generate_learning.py` 可从 `nazha_subtitle.txt`（哪吒台词）和 `to_implement_template.txt`（汉字模板）自动生成 `gg_learning.txt`。
+关卡直接来自 `gg_learning.txt`，**可以手动编辑**该文件来增删或修改关卡。每行一关，格式为：
 
-每行格式示例：
+```
+字:包含该字的例句的字字
+```
+
+示例：
 
 ```
 一:孕育了一颗混元珠的一字
+二:我要证明我才是十二金仙的最佳人选的二字
 ```
+
+> `generate_learning.py` 是一个可选的辅助脚本，可从 `nazha_subtitle.txt`（哪吒台词）和 `to_implement_template.txt`（汉字模板）批量生成 `gg_learning.txt`，但无需运行它——直接编辑 `gg_learning.txt` 即可。
 
 ### ✨ 功能特色
 
