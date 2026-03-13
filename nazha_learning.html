@@ -444,6 +444,10 @@ body {
       <label for="cfg-read3">答对后朗读目标字 3 遍</label>
     </div>
     <div class="config-item">
+      <input type="checkbox" id="cfg-shuffle" checked>
+      <label for="cfg-shuffle">选字时打乱卡片顺序（防止按位置猜答案）</label>
+    </div>
+    <div class="config-item">
       <label for="cfg-exclude">排除关卡（填关卡序号，逗号分隔）：</label>
       <input type="text" id="cfg-exclude" placeholder="例：5,10,15">
       <button class="config-save-btn" onclick="saveConfig()">保存</button>
@@ -510,7 +514,7 @@ let pendingReviews = JSON.parse(localStorage.getItem('nazha_reviews') || '[]');
 let normalLevelsCompleted = parseInt(localStorage.getItem('nazha_normal_count') || '0');
 let isReviewMode = false;
 let reviewReturnLevel = -1;
-let config = JSON.parse(localStorage.getItem('nazha_config') || '{"readAfterCorrect":true,"excludedLevels":[]}');
+let config = JSON.parse(localStorage.getItem('nazha_config') || '{"readAfterCorrect":true,"shuffleCards":true,"excludedLevels":[]}');
 
 // ===== 音效 (Web Audio API) =====
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -636,6 +640,7 @@ function showLevelSelect() {
 // ===== 配置 =====
 function saveConfig() {
   config.readAfterCorrect = document.getElementById('cfg-read3').checked;
+  config.shuffleCards = document.getElementById('cfg-shuffle').checked;
   const raw = document.getElementById('cfg-exclude').value;
   config.excludedLevels = raw.split(',')
     .map(s => parseInt(s.trim()))
@@ -646,6 +651,7 @@ function saveConfig() {
 
 function loadConfigUI() {
   document.getElementById('cfg-read3').checked = config.readAfterCorrect !== false;
+  document.getElementById('cfg-shuffle').checked = config.shuffleCards !== false;
   document.getElementById('cfg-exclude').value = (config.excludedLevels || []).join(', ');
 }
 
@@ -790,13 +796,15 @@ function enterSelectMode() {
   document.getElementById('replay-btn').style.display = 'block';
 
   // 打乱卡片顺序，防止小朋友通过位置记忆而不是认字来选答案
-  const container = document.getElementById('cards-container');
-  const cardArray = [...container.querySelectorAll('.char-card')];
-  for (let i = cardArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [cardArray[i], cardArray[j]] = [cardArray[j], cardArray[i]];
+  if (config.shuffleCards !== false) {
+    const container = document.getElementById('cards-container');
+    const cardArray = [...container.querySelectorAll('.char-card')];
+    for (let i = cardArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cardArray[i], cardArray[j]] = [cardArray[j], cardArray[i]];
+    }
+    cardArray.forEach(card => container.appendChild(card));
   }
-  cardArray.forEach(card => container.appendChild(card));
 
   // 使卡片可点击
   const cards = document.querySelectorAll('.char-card');
