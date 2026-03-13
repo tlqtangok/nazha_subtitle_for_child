@@ -980,6 +980,12 @@ function replayReading() {
 
   stopTimer();
 
+  // 复原卡片顺序为最初的正确顺序
+  const container = document.getElementById('cards-container');
+  const cardArray = [...container.querySelectorAll('.char-card')];
+  cardArray.sort((a, b) => parseInt(a.dataset.index) - parseInt(b.dataset.index));
+  cardArray.forEach(card => container.appendChild(card));
+
   const [target, sentence] = LEVELS[currentLevel];
   const { mainPart, fullSentence } = parseSentence(target, sentence);
   const chars = [...mainPart];
