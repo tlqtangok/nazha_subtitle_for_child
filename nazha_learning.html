@@ -479,11 +479,7 @@ body {
         <input type="checkbox" id="cfg-shuffle" checked>
         <label for="cfg-shuffle">选字时打乱卡片顺序（防止按位置猜答案）</label>
       </div>
-      <div class="config-item">
-        <label for="cfg-exclude">排除关卡（填关卡序号，逗号分隔）：</label>
-        <input type="text" id="cfg-exclude" placeholder="例：5,10,15">
-        <button class="config-save-btn" onclick="saveConfig()">保存</button>
-      </div>
+      <button class="config-save-btn" onclick="saveConfig()" style="width: 100%; margin-top: 10px;">💾 保存设置</button>
     </details>
     <button id="filter-toggle-btn" class="config-save-btn" onclick="toggleFilterMode()" style="height: 40px; align-self: flex-start;">🔍 过滤</button>
   </div>
@@ -626,7 +622,29 @@ async function loadFilteredCharsFromBackend() {
     
     // Parse the response format: output is directly the object
     if (data.output && typeof data.output === 'object') {
-      filteredChars = data.output;
+      const backendData = data.output;
+      
+      // Load filtered characters (all keys except config_nazha_learning)
+      filteredChars = {};
+      for (const [key, value] of Object.entries(backendData)) {
+        if (key !== 'config_nazha_learning') {
+          filteredChars[key] = value;
+        }
+      }
+      
+      // Load config from backend
+      if (backendData.config_nazha_learning) {
+        const backendConfig = backendData.config_nazha_learning;
+        config.readAfterCorrect = backendConfig.read_3_times !== false; // default true
+        config.shuffleCards = backendConfig.shuffle_char !== false; // default true
+        localStorage.setItem('nazha_config', JSON.stringify(config));
+        console.log('Loaded config from backend:', backendConfig);
+      } else {
+        // No config in backend, use defaults (true, true)
+        config.readAfterCorrect = true;
+        config.shuffleCards = true;
+      }
+      
       console.log('Loaded filtered chars from backend:', filteredChars);
     } else {
       console.log('No nazha_learning data found in output');
@@ -653,7 +671,7 @@ let pendingReviews = JSON.parse(localStorage.getItem('nazha_reviews') || '[]');
 let normalLevelsCompleted = parseInt(localStorage.getItem('nazha_normal_count') || '0');
 let isReviewMode = false;
 let reviewReturnLevel = -1;
-let config = JSON.parse(localStorage.getItem('nazha_config') || '{"readAfterCorrect":true,"shuffleCards":true,"excludedLevels":[]}');
+let config = JSON.parse(localStorage.getItem('nazha_config') || '{"readAfterCorrect":true,"shuffleCards":true}');
 
 // Multi-selection mode
 let multiSelectMode = false;
@@ -736,7 +754,6 @@ function renderLevelSelect() {
   grid.innerHTML = '';
   let completedCount = Object.values(completedLevels).filter(v => v === 'green' || v === true).length;
   // v === true: backward compatibility with old localStorage format that stored boolean true
-  const excludedSet = new Set(config.excludedLevels || []);
 
   LEVELS.forEach((level, idx) => {
     const levelNum = idx + 1;
@@ -755,18 +772,7 @@ function renderLevelSelect() {
       btn.style.filter = 'grayscale(100%)';
     }
 
-    if (excludedSet.has(levelNum)) {
-      btn.className = 'level-btn excluded';
-      btn.title = '已排除（点击可取消排除）';
-      if (!multiSelectMode) {
-        btn.onclick = () => {
-          config.excludedLevels = config.excludedLevels.filter(n => n !== levelNum);
-          localStorage.setItem('nazha_config', JSON.stringify(config));
-          document.getElementById('cfg-exclude').value = config.excludedLevels.join(', ');
-          renderLevelSelect();
-        };
-      }
-    } else if (isCurrentlyGray && !multiSelectMode) {
+    if (isCurrentlyGray && !multiSelectMode) {
       // Gray items cannot be clicked in normal mode
       btn.className = 'level-btn excluded';
       btn.title = '已过滤（点击「过滤」按钮可修改）';
@@ -915,8 +921,17 @@ async function saveProgressToBackend() {
       // Skip entries with value === true (un-grayed characters)
     }
     
+    // Add config to the data
+    const dataToSave = {
+      ...cleanedData,
+      config_nazha_learning: {
+        read_3_times: config.readAfterCorrect !== false,
+        shuffle_char: config.shuffleCards !== false
+      }
+    };
+    
     // Send as object directly, not JSON string
-    await write_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', cleanedData);
+    await write_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', dataToSave);
     
     // Update local filteredChars
     filteredChars = cleanedData;
@@ -940,32 +955,48 @@ function showLevelSelect() {
 }
 
 // ===== 配置 =====
-function saveConfig() {
-  config.readAfterCorrect = document.getElementById('cfg-read3').checked;
-  config.shuffleCards = document.getElementById('cfg-shuffle').checked;
-  const raw = document.getElementById('cfg-exclude').value;
-  config.excludedLevels = raw.split(',')
-    .map(s => parseInt(s.trim()))
-    .filter(n => !isNaN(n) && n > 0 && n <= LEVELS.length);
+async function saveConfig() {
+  const readAfterCorrect = document.getElementById('cfg-read3').checked;
+  const shuffleCards = document.getElementById('cfg-shuffle').checked;
+  
+  // Update local config
+  config.readAfterCorrect = readAfterCorrect;
+  config.shuffleCards = shuffleCards;
   localStorage.setItem('nazha_config', JSON.stringify(config));
+  
+  // Save to backend
+  try {
+    // Prepare data: merge filtered chars with config
+    const dataToSave = {
+      ...filteredChars,
+      config_nazha_learning: {
+        read_3_times: readAfterCorrect,
+        shuffle_char: shuffleCards
+      }
+    };
+    
+    await write_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', dataToSave);
+    alert('设置已保存到云端！');
+  } catch (error) {
+    alert('保存失败: ' + error.message);
+    console.error('Failed to save config:', error);
+  }
+  
   renderLevelSelect();
 }
 
 function loadConfigUI() {
   document.getElementById('cfg-read3').checked = config.readAfterCorrect !== false;
   document.getElementById('cfg-shuffle').checked = config.shuffleCards !== false;
-  document.getElementById('cfg-exclude').value = (config.excludedLevels || []).join(', ');
 }
 
 // ===== 下一关辅助 =====
 function findNextLevel(fromIdx) {
-  const excludedSet = new Set(config.excludedLevels || []);
   let next = fromIdx + 1;
   while (next < LEVELS.length) {
-    const levelNum = next + 1;
     const char = LEVELS[next][0];
-    // Skip excluded levels and gray (filtered) levels
-    if (excludedSet.has(levelNum) || filteredChars[char] === false) {
+    // Skip gray (filtered) levels
+    if (filteredChars[char] === false) {
       next++;
     } else {
       break;
