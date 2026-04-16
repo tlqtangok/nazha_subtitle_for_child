@@ -110,6 +110,33 @@ body {
   50% { box-shadow: 0 0 0 10px rgba(255,167,38,0); }
 }
 
+/* ===== Multi-select checkbox ===== */
+.select-checkbox {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #fff;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  pointer-events: none;
+  z-index: 10;
+}
+.select-checkbox.checked {
+  background: #4caf50;
+  border-color: #4caf50;
+}
+.select-checkbox.checked::after {
+  content: "✓";
+  color: white;
+  font-weight: bold;
+}
+
 /* ===== 配置面板 ===== */
 .config-panel {
   background: rgba(255,255,255,0.1);
@@ -478,8 +505,14 @@ body {
 </div>
 
 <script>
+// ===== Backend Configuration =====
+const BASEURL = 'https://jesson.tech:10221';
+const ROUTE = '/post/run';
+const TOKEN_KEY = 'glo_cpp_srv_token';
+
 // ===== 关卡数据（从 gg_learning.txt 动态加载）=====
 let LEVELS = [];
+let filteredChars = {}; // Characters to be grayed out from backend
 
 // 每次答错后，几关后安排复习
 const REVIEW_INTERVAL = 5;
@@ -502,6 +535,101 @@ async function loadLevels() {
   }
 }
 
+// ===== Backend API Functions =====
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+async function promptForToken() {
+  return new Promise((resolve) => {
+    const token = prompt('Please enter your token:');
+    if (token) {
+      setToken(token);
+      resolve(token);
+    } else {
+      resolve(null);
+    }
+  });
+}
+
+async function read_glo_cpp_srv(baseurl, route, path, token) {
+  const payload = { cmd: 'get_global_json', args: { path: '/' + path, token: token } };
+  console.log('Request payload:', payload);
+  const response = await fetch(baseurl + route, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + text);
+  const data = JSON.parse(text);
+  if (data.code !== 0) throw new Error(data.error || 'Error code: ' + data.code);
+  return data;
+}
+
+async function write_glo_cpp_srv(baseurl, route, path, value) {
+  let token = getToken();
+  if (!token) {
+    token = await promptForToken();
+    if (!token) throw new Error('Token required');
+  }
+
+  const payload = { cmd: 'patch_global_json', args: { [path]: value, token: token } };
+  console.log('Sending payload:', payload);
+  const response = await fetch(baseurl + route, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + text);
+  const data = JSON.parse(text);
+  if (data.code !== 0) {
+    if (data.error && (data.error.includes('valid token') || data.error.includes('invalid token'))) {
+      clearToken();
+      throw new Error('Token invalid. Please re-enter token.');
+    }
+    throw new Error(data.error || 'Error code: ' + data.code);
+  }
+  return data;
+}
+
+async function loadFilteredCharsFromBackend() {
+  let token = getToken();
+  if (!token) {
+    token = await promptForToken();
+    if (!token) {
+      console.log('No token provided, skipping backend filter load');
+      return;
+    }
+  }
+
+  try {
+    const data = await read_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', token);
+    if (data.data && data.data.nazha_learning) {
+      filteredChars = JSON.parse(data.data.nazha_learning);
+      console.log('Loaded filtered chars from backend:', filteredChars);
+    } else {
+      console.log('No nazha_learning data found on backend');
+      filteredChars = {};
+    }
+  } catch (error) {
+    console.warn('Failed to load filtered chars from backend:', error.message);
+    if (error.message.includes('Token invalid')) {
+      clearToken();
+    }
+    filteredChars = {};
+  }
+}
+
 // ===== 状态 =====
 let currentLevel = 0;
 let timerInterval = null;
@@ -515,6 +643,15 @@ let normalLevelsCompleted = parseInt(localStorage.getItem('nazha_normal_count') 
 let isReviewMode = false;
 let reviewReturnLevel = -1;
 let config = JSON.parse(localStorage.getItem('nazha_config') || '{"readAfterCorrect":true,"shuffleCards":true,"excludedLevels":[]}');
+
+// Multi-selection mode
+let multiSelectMode = false;
+let selectedCharsForFilter = {};
+let longPressTimer = null;
+let longPressTriggered = false;
+const LONG_PRESS_DURATION = 800; // ms
+
+
 
 // ===== 音效 (Web Audio API) =====
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -596,18 +733,29 @@ function renderLevelSelect() {
 
   LEVELS.forEach((level, idx) => {
     const levelNum = idx + 1;
+    const char = level[0];
     const btn = document.createElement('button');
-    btn.innerHTML = '<span>' + level[0] + '</span><span class="level-num">' + levelNum + '</span>';
+    btn.innerHTML = '<span>' + char + '</span><span class="level-num">' + levelNum + '</span>';
+    btn.dataset.char = char;
+    btn.dataset.idx = idx;
+
+    // Apply gray filter from backend
+    if (filteredChars[char] === false) {
+      btn.style.opacity = '0.3';
+      btn.style.filter = 'grayscale(100%)';
+    }
 
     if (excludedSet.has(levelNum)) {
       btn.className = 'level-btn excluded';
       btn.title = '已排除（点击可取消排除）';
-      btn.onclick = () => {
-        config.excludedLevels = config.excludedLevels.filter(n => n !== levelNum);
-        localStorage.setItem('nazha_config', JSON.stringify(config));
-        document.getElementById('cfg-exclude').value = config.excludedLevels.join(', ');
-        renderLevelSelect();
-      };
+      if (!multiSelectMode) {
+        btn.onclick = () => {
+          config.excludedLevels = config.excludedLevels.filter(n => n !== levelNum);
+          localStorage.setItem('nazha_config', JSON.stringify(config));
+          document.getElementById('cfg-exclude').value = config.excludedLevels.join(', ');
+          renderLevelSelect();
+        };
+      }
     } else {
       btn.className = 'level-btn';
       const status = completedLevels[idx];
@@ -619,14 +767,146 @@ function renderLevelSelect() {
       } else {
         btn.classList.add('current');
       }
-      btn.onclick = () => startLevel(idx);
+      
+      if (!multiSelectMode) {
+        btn.onclick = () => {
+          if (!longPressTriggered) {
+            startLevel(idx);
+          }
+          longPressTriggered = false;
+        };
+        
+        // Add long-press handlers
+        btn.addEventListener('mousedown', (e) => startLongPress(e, btn));
+        btn.addEventListener('mouseup', cancelLongPress);
+        btn.addEventListener('mouseleave', cancelLongPress);
+        btn.addEventListener('touchstart', (e) => startLongPress(e, btn));
+        btn.addEventListener('touchend', cancelLongPress);
+        btn.addEventListener('touchcancel', cancelLongPress);
+      } else {
+        // Multi-select mode - add checkbox
+        const checkbox = document.createElement('div');
+        checkbox.className = 'select-checkbox';
+        if (selectedCharsForFilter[char]) {
+          checkbox.classList.add('checked');
+        }
+        btn.appendChild(checkbox);
+        
+        btn.onclick = () => toggleCharSelection(char, btn);
+        btn.style.cursor = 'pointer';
+      }
     }
     grid.appendChild(btn);
   });
 
+  // Update progress display
   const total = LEVELS.length;
   document.getElementById('progress-fill').style.width = total ? (completedCount / total * 100) + '%' : '0%';
-  document.getElementById('progress-text').textContent = '已完成 ' + completedCount + '/' + total + ' 关';
+  
+  if (multiSelectMode) {
+    const selectedCount = Object.keys(selectedCharsForFilter).length;
+    document.getElementById('progress-text').textContent = '已选择 ' + selectedCount + ' 个字';
+  } else {
+    document.getElementById('progress-text').textContent = '已完成 ' + completedCount + '/' + total + ' 关';
+  }
+}
+
+function startLongPress(e, btn) {
+  // Don't prevent default - let click events work normally
+  cancelLongPress(); // Clear any existing timer
+  longPressTriggered = false;
+  longPressTimer = setTimeout(() => {
+    longPressTriggered = true;
+    enterMultiSelectMode();
+  }, LONG_PRESS_DURATION);
+}
+
+function cancelLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}
+
+function enterMultiSelectMode() {
+  multiSelectMode = true;
+  selectedCharsForFilter = {};
+  renderLevelSelect();
+  showMultiSelectControls();
+}
+
+function exitMultiSelectMode() {
+  multiSelectMode = false;
+  selectedCharsForFilter = {};
+  renderLevelSelect();
+  hideMultiSelectControls();
+}
+
+function toggleCharSelection(char, btn) {
+  if (selectedCharsForFilter[char]) {
+    delete selectedCharsForFilter[char];
+    btn.style.border = '';
+  } else {
+    selectedCharsForFilter[char] = false; // false means gray
+    btn.style.border = '3px solid #ff5722';
+  }
+  renderLevelSelect();
+}
+
+async function saveProgressToBackend() {
+  if (Object.keys(selectedCharsForFilter).length === 0) {
+    alert('请先选择要标记为灰色的字');
+    return;
+  }
+
+  try {
+    // Merge with existing filtered chars to preserve previous selections
+    const mergedData = { ...filteredChars, ...selectedCharsForFilter };
+    const dataToSave = JSON.stringify(mergedData);
+    await write_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', dataToSave);
+    
+    // Update local filteredChars
+    filteredChars = mergedData;
+    
+    alert('保存成功！');
+    exitMultiSelectMode();
+  } catch (error) {
+    alert('保存失败: ' + error.message);
+    if (error.message.includes('Token invalid')) {
+      // Token was cleared, will prompt again next time
+    }
+  }
+}
+
+function showMultiSelectControls() {
+  let controls = document.getElementById('multi-select-controls');
+  if (!controls) {
+    controls = document.createElement('div');
+    controls.id = 'multi-select-controls';
+    controls.style.cssText = 'position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.95); padding: 15px 25px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.3); display: flex; gap: 15px; z-index: 1000;';
+    
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = '💾 保存进度';
+    saveBtn.style.cssText = 'padding: 12px 20px; border-radius: 12px; border: none; background: linear-gradient(135deg, #66bb6a, #43a047); color: white; font-size: 16px; font-weight: bold; cursor: pointer;';
+    saveBtn.onclick = saveProgressToBackend;
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '✖ 取消';
+    cancelBtn.style.cssText = 'padding: 12px 20px; border-radius: 12px; border: none; background: linear-gradient(135deg, #e0e0e0, #bdbdbd); color: #333; font-size: 16px; font-weight: bold; cursor: pointer;';
+    cancelBtn.onclick = exitMultiSelectMode;
+    
+    controls.appendChild(saveBtn);
+    controls.appendChild(cancelBtn);
+    document.body.appendChild(controls);
+  }
+  controls.style.display = 'flex';
+}
+
+function hideMultiSelectControls() {
+  const controls = document.getElementById('multi-select-controls');
+  if (controls) {
+    controls.style.display = 'none';
+  }
 }
 
 function showLevelSelect() {
@@ -1020,7 +1300,8 @@ if ('speechSynthesis' in window) {
 
 // ===== 初始化 =====
 createStars();
-loadLevels().then(() => {
+loadLevels().then(async () => {
+  await loadFilteredCharsFromBackend();
   loadConfigUI();
   renderLevelSelect();
 });
