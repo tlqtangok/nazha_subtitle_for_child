@@ -115,26 +115,28 @@ body {
   position: absolute;
   top: 6px;
   right: 6px;
-  width: 24px;
-  height: 24px;
-  border: 2px solid #fff;
+  width: 26px;
+  height: 26px;
+  border: 3px solid #333;
   border-radius: 6px;
-  background: rgba(0,0,0,0.3);
+  background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 20px;
   pointer-events: none;
   z-index: 10;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 .select-checkbox.checked {
   background: #4caf50;
-  border-color: #4caf50;
+  border-color: #2e7d32;
 }
 .select-checkbox.checked::after {
   content: "✓";
   color: white;
   font-weight: bold;
+  font-size: 22px;
 }
 
 /* ===== 配置面板 ===== */
@@ -561,7 +563,7 @@ async function promptForToken() {
 }
 
 async function read_glo_cpp_srv(baseurl, route, path, token) {
-  const payload = { cmd: 'get_global_json', args: { path: '/' + path, token: token } };
+  const payload = { cmd: 'get_global_json', args: { path: path, token: token } };
   console.log('Request payload:', payload);
   const response = await fetch(baseurl + route, {
     method: 'POST',
@@ -613,12 +615,15 @@ async function loadFilteredCharsFromBackend() {
   }
 
   try {
-    const data = await read_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', token);
-    if (data.data && data.data.nazha_learning) {
-      filteredChars = JSON.parse(data.data.nazha_learning);
+    const data = await read_glo_cpp_srv(BASEURL, ROUTE, '/nazha_learning', token);
+    console.log('Backend response:', data);
+    
+    // Parse the response format: output is directly the object
+    if (data.output && typeof data.output === 'object') {
+      filteredChars = data.output;
       console.log('Loaded filtered chars from backend:', filteredChars);
     } else {
-      console.log('No nazha_learning data found on backend');
+      console.log('No nazha_learning data found in output');
       filteredChars = {};
     }
   } catch (error) {
@@ -862,8 +867,8 @@ async function saveProgressToBackend() {
   try {
     // Merge with existing filtered chars to preserve previous selections
     const mergedData = { ...filteredChars, ...selectedCharsForFilter };
-    const dataToSave = JSON.stringify(mergedData);
-    await write_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', dataToSave);
+    // Send as object directly, not JSON string
+    await write_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', mergedData);
     
     // Update local filteredChars
     filteredChars = mergedData;
