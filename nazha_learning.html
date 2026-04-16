@@ -747,7 +747,10 @@ function renderLevelSelect() {
     btn.dataset.idx = idx;
 
     // Apply gray filter from backend
-    if (filteredChars[char] === false) {
+    const isCurrentlyGray = filteredChars[char] === false;
+    const willBeGray = char in selectedCharsForFilter ? selectedCharsForFilter[char] === false : isCurrentlyGray;
+    
+    if (willBeGray) {
       btn.style.opacity = '0.3';
       btn.style.filter = 'grayscale(100%)';
     }
@@ -868,11 +871,16 @@ function updateFilterButton() {
 }
 
 function toggleCharSelection(char, btn) {
-  if (selectedCharsForFilter[char]) {
+  if (char in selectedCharsForFilter) {
+    // Already selected, deselect it
     delete selectedCharsForFilter[char];
     btn.style.border = '';
   } else {
-    selectedCharsForFilter[char] = false; // false means gray
+    // Toggle based on current gray state
+    // If currently gray (false), set to true to un-gray it
+    // If not gray (undefined or true), set to false to gray it
+    const isCurrentlyGray = filteredChars[char] === false;
+    selectedCharsForFilter[char] = isCurrentlyGray ? true : false;
     btn.style.border = '3px solid #ff5722';
   }
   renderLevelSelect();
@@ -880,18 +888,29 @@ function toggleCharSelection(char, btn) {
 
 async function saveProgressToBackend() {
   if (Object.keys(selectedCharsForFilter).length === 0) {
-    alert('请先选择要标记为灰色的字');
+    alert('请先选择要修改的字');
     return;
   }
 
   try {
-    // Merge with existing filtered chars to preserve previous selections
+    // Merge with existing filtered chars
     const mergedData = { ...filteredChars, ...selectedCharsForFilter };
+    
+    // Clean up: remove entries where value is true (not gray)
+    // Only keep false values (gray characters)
+    const cleanedData = {};
+    for (const [key, value] of Object.entries(mergedData)) {
+      if (value === false) {
+        cleanedData[key] = false;
+      }
+      // Skip entries with value === true (un-grayed characters)
+    }
+    
     // Send as object directly, not JSON string
-    await write_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', mergedData);
+    await write_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', cleanedData);
     
     // Update local filteredChars
-    filteredChars = mergedData;
+    filteredChars = cleanedData;
     
     alert('保存成功！');
     exitMultiSelectMode();
