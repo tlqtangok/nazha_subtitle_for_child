@@ -450,6 +450,39 @@ body {
   .char-card { width: 50px; height: 62px; font-size: 1.5em; }
   .cards-container { gap: 6px; }
 }
+
+/* ===== Toast notification ===== */
+.toast {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 25px;
+  font-size: 14px;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  animation: toast-slide-in 0.3s ease-out;
+  pointer-events: none;
+}
+.toast.success {
+  background: linear-gradient(135deg, #66bb6a, #43a047);
+}
+.toast.error {
+  background: linear-gradient(135deg, #ef5350, #e53935);
+}
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
 </style>
 </head>
 <body>
@@ -513,6 +546,21 @@ body {
 const BASEURL = 'https://jesson.tech:10221';
 const ROUTE = '/post/run';
 const TOKEN_KEY = 'glo_cpp_srv_token';
+
+// ===== Toast Notification =====
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(-50%) translateY(-20px)';
+    toast.style.transition = 'all 0.3s ease-out';
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
+}
 
 // ===== 关卡数据（从 gg_learning.txt 动态加载）=====
 let LEVELS = [];
@@ -903,7 +951,7 @@ function toggleCharSelection(char, btn) {
 
 async function saveProgressToBackend() {
   if (Object.keys(selectedCharsForFilter).length === 0) {
-    alert('请先选择要修改的字');
+    showToast('⚠️ 请先选择要修改的字', 'error');
     return;
   }
 
@@ -936,10 +984,10 @@ async function saveProgressToBackend() {
     // Update local filteredChars
     filteredChars = cleanedData;
     
-    alert('保存成功！');
+    showToast('✅ 保存成功！', 'success');
     exitMultiSelectMode();
   } catch (error) {
-    alert('保存失败: ' + error.message);
+    showToast('❌ 保存失败: ' + error.message, 'error');
     if (error.message.includes('Token invalid')) {
       // Token was cleared, will prompt again next time
     }
@@ -976,9 +1024,9 @@ async function saveConfig() {
     };
     
     await write_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', dataToSave);
-    alert('设置已保存到云端！');
+    showToast('✅ 设置已保存到云端', 'success');
   } catch (error) {
-    alert('保存失败: ' + error.message);
+    showToast('❌ 保存失败: ' + error.message, 'error');
     console.error('Failed to save config:', error);
   }
   
