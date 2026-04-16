@@ -766,6 +766,15 @@ function renderLevelSelect() {
           renderLevelSelect();
         };
       }
+    } else if (isCurrentlyGray && !multiSelectMode) {
+      // Gray items cannot be clicked in normal mode
+      btn.className = 'level-btn excluded';
+      btn.title = '已过滤（点击「过滤」按钮可修改）';
+      btn.style.cursor = 'not-allowed';
+      btn.onclick = (e) => {
+        e.preventDefault();
+        // Do nothing - prevent starting the level
+      };
     } else {
       btn.className = 'level-btn';
       const status = completedLevels[idx];
@@ -952,7 +961,16 @@ function loadConfigUI() {
 function findNextLevel(fromIdx) {
   const excludedSet = new Set(config.excludedLevels || []);
   let next = fromIdx + 1;
-  while (next < LEVELS.length && excludedSet.has(next + 1)) next++;
+  while (next < LEVELS.length) {
+    const levelNum = next + 1;
+    const char = LEVELS[next][0];
+    // Skip excluded levels and gray (filtered) levels
+    if (excludedSet.has(levelNum) || filteredChars[char] === false) {
+      next++;
+    } else {
+      break;
+    }
+  }
   return next < LEVELS.length ? next : -1;
 }
 
