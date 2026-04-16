@@ -792,7 +792,8 @@ function renderLevelSelect() {
         // Multi-select mode - add checkbox
         const checkbox = document.createElement('div');
         checkbox.className = 'select-checkbox';
-        if (selectedCharsForFilter[char]) {
+        // Check if the char is in the selection (key exists), not the value
+        if (char in selectedCharsForFilter) {
           checkbox.classList.add('checked');
         }
         btn.appendChild(checkbox);
