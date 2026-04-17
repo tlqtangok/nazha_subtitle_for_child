@@ -969,20 +969,36 @@ async function saveProgressToBackend() {
       // Skip entries with value === true (un-grayed characters)
     }
     
-    // Add config to the data
-    const dataToSave = {
-      ...cleanedData,
-      config_nazha_learning: {
-        read_3_times: config.readAfterCorrect !== false,
-        shuffle_char: config.shuffleCards !== false
+    // IMPORTANT: For characters that were changed from false to true (un-grayed),
+    // we need to explicitly tell backend to delete them by setting to null
+    const dataToSave = {};
+    for (const [key, value] of Object.entries(mergedData)) {
+      if (value === false) {
+        dataToSave[key] = false;
+      } else if (value === true && filteredChars[key] === false) {
+        // This character was gray (false) before, now changed to true (un-gray)
+        // Send null to backend to delete this entry
+        dataToSave[key] = null;
       }
+    }
+    
+    // Add config to the data
+    dataToSave.config_nazha_learning = {
+      read_3_times: config.readAfterCorrect !== false,
+      shuffle_char: config.shuffleCards !== false
     };
     
     // Send as object directly, not JSON string
     await write_glo_cpp_srv(BASEURL, ROUTE, 'nazha_learning', dataToSave);
     
-    // Update local filteredChars
-    filteredChars = cleanedData;
+    // Update local filteredChars: only keep false values
+    const updatedFilteredChars = {};
+    for (const [key, value] of Object.entries(mergedData)) {
+      if (value === false) {
+        updatedFilteredChars[key] = false;
+      }
+    }
+    filteredChars = updatedFilteredChars;
     
     showToast('✅ 保存成功！', 'success');
     exitMultiSelectMode();
