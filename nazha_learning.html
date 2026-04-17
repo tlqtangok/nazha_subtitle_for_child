@@ -634,7 +634,7 @@ async function write_glo_cpp_srv(baseurl, route, path, value) {
     if (!token) throw new Error('Token required');
   }
 
-  const payload = { cmd: 'patch_global_json', args: { [path]: value, token: token } };
+  const payload = { cmd: 'patch_global_json', args: { [path]: value, token:getToken()} };
   console.log('Sending payload:', payload);
   const response = await fetch(baseurl + route, {
     method: 'POST',
