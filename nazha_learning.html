@@ -1202,6 +1202,7 @@ function enterSelectMode() {
   document.getElementById('replay-btn').style.display = 'block';
 
   // 打乱卡片顺序，防止小朋友通过位置记忆而不是认字来选答案
+  const shuffleDelay = (config.shuffleCards !== false) ? 300 : 0; // 0.3s for transition
   if (config.shuffleCards !== false) {
     const container = document.getElementById('cards-container');
     const cardArray = [...container.querySelectorAll('.char-card')];
@@ -1212,12 +1213,14 @@ function enterSelectMode() {
     cardArray.forEach(card => container.appendChild(card));
   }
 
-  // 使卡片可点击
-  const cards = document.querySelectorAll('.char-card');
-  cards.forEach(card => {
-    card.classList.add('selectable');
-    card.onclick = () => onCardClick(card);
-  });
+  // 使卡片可点击 - 延迟到洗牌动画完成后
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.char-card');
+    cards.forEach(card => {
+      card.classList.add('selectable');
+      card.onclick = () => onCardClick(card);
+    });
+  }, shuffleDelay);
 
   // 开始计时
   startTimer();
