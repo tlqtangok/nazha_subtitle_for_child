@@ -760,6 +760,15 @@ function playSound(type) {
       gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
       osc.start(audioCtx.currentTime);
       osc.stop(audioCtx.currentTime + 0.1);
+    } else if (type === 'ready') {
+      // Short pleasant beep to indicate shuffle complete and ready to select
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(1000, audioCtx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.15);
     }
   } catch(e) {}
 }
@@ -1220,6 +1229,10 @@ function enterSelectMode() {
       card.classList.add('selectable');
       card.onclick = () => onCardClick(card);
     });
+    // Play a short alert sound to notify user they can now choose
+    if (shuffleDelay > 0) {
+      playSound('ready');
+    }
   }, shuffleDelay);
 
   // 开始计时
